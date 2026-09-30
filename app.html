@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TeaMath</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,'Segoe UI',Roboto,sans-serif; background:#0d1117; color:#e6edf3; }
+  .wrap { max-width:720px; margin:0 auto; padding:36px 20px 60px; }
+  h1 { font-size:1.9rem; margin:0; }
+  .tag { color:#9da7b3; margin:6px 0 18px; }
+  .presets { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:22px; }
+  .presets button { background:#21262d; color:#c9d1d9; border:1px solid #30363d; border-radius:999px; padding:8px 16px; font-size:0.9rem; cursor:pointer; }
+  .presets button:hover { border-color:#3fb950; color:#3fb950; }
+  section { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:20px; margin-bottom:18px; }
+  h2 { font-size:1rem; margin:0 0 14px; color:#e6edf3; }
+  .row { display:flex; flex-wrap:wrap; gap:14px; margin-bottom:14px; }
+  label { display:block; font-size:0.78rem; color:#9da7b3; margin-bottom:4px; }
+  input, select { background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px; padding:8px 10px; font-size:0.95rem; width:130px; }
+  .outs { display:flex; flex-wrap:wrap; gap:12px; }
+  .out { flex:1 1 150px; background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:12px 14px; }
+  .out .val { font-size:1.15rem; font-weight:700; color:#58a6ff; }
+  .out .lab { font-size:0.75rem; color:#9da7b3; margin-top:4px; }
+  .foot { color:#6e7681; font-size:0.8rem; margin-top:10px; }
+  a { color:#58a6ff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>&#127861; TeaMath</h1>
+  <p class="tag">Tea brewing math - the tin says 3-5 minutes like that is a unit, the water temperature matters more than the leaf price, and the second steep is a different drink.</p>
+  <div class="presets">
+    <button data-p="sencha">Sencha mug</button>
+    <button data-p="oolong">Oolong resteeps</button>
+    <button data-p="english">English breakfast</button>
+    <button data-p="mint">Mint before bed</button>
+  </div>
+
+  <section>
+    <h2>1. Leaf and water</h2>
+    <div class="row">
+      <div><label>Tea type</label>
+        <select id="type"><option value="green">Green</option><option value="white">White</option><option value="oolong">Oolong</option><option value="black">Black</option><option value="puerh">Pu-erh</option><option value="herbal">Herbal / tisane</option></select></div>
+      <div><label>Mug size (ml)</label><input id="ml" type="number" step="50" min="100" value="350"></div>
+    </div>
+    <div class="outs">
+      <div class="out"><div class="val" id="o-temp"></div><div class="lab">Water temperature</div></div>
+      <div class="out"><div class="val" id="o-leaf"></div><div class="lab">Leaf amount</div></div>
+      <div class="out"><div class="val" id="o-note"></div><div class="lab">Leaf wisdom</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>2. Getting to temperature</h2>
+    <div class="outs">
+      <div class="out"><div class="val" id="o-cool"></div><div class="lab">Wait after the boil (22C kitchen)</div></div>
+      <div class="out"><div class="val" id="o-dilute"></div><div class="lab">Or cold tap water to add</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>3. Steep schedule</h2>
+    <div class="outs" id="o-steeps"></div>
+  </section>
+
+  <p class="foot">Estimates - your kettle, your leaf, your tongue. The timer is the authority. <a href="index.html">About</a> &middot; <a href="https://github.com/iLanis-agent/teamath">Code</a></p>
+</div>
+<script src="engine.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var num = function (id) { var v = parseFloat($(id).value); return isNaN(v) ? 0 : v; };
+
+  var PRESETS = {
+    sencha:   { type:'green',  ml:350 },
+    oolong:   { type:'oolong', ml:250 },
+    english:  { type:'black',  ml:400 },
+    mint:     { type:'herbal', ml:300 }
+  };
+
+  function compute() {
+    var type = $('type').value, ml = num('ml');
+    var p = TeaMath.profile(type);
+    $('o-temp').textContent = p.tempC === 100 ? '100C - rolling boil' : p.tempC + 'C - not boiling';
+    $('o-leaf').textContent = TeaMath.leafGrams(type, ml) + ' g';
+    $('o-note').textContent = p.note;
+
+    var cool = TeaMath.coolMinutes(p.tempC);
+    $('o-cool').textContent = cool === 0 ? 'pour right away' : '~' + cool + ' min off the boil';
+    $('o-dilute').textContent = p.tempC === 100 ? 'none needed' : '+ ' + TeaMath.coldWaterMl(ml, p.tempC) + ' ml cold into ' + ml + ' ml boiling';
+
+    var plan = TeaMath.steepPlan(type);
+    $('o-steeps').innerHTML = plan.map(function (s) {
+      var caf = TeaMath.caffeinePct(s.n);
+      return '<div class="out"><div class="val">' + TeaMath.fmtSec(s.seconds) + '</div><div class="lab">Steep ' + s.n + ' - ~' + caf + '% of the caffeine</div></div>';
+    }).join('');
+  }
+
+  function apply(p) {
+    ['type','ml'].forEach(function (id) { $(id).value = p[id]; });
+    compute();
+  }
+
+  document.querySelectorAll('.presets button').forEach(function (b) {
+    b.addEventListener('click', function () { apply(PRESETS[b.getAttribute('data-p')]); });
+  });
+  document.querySelectorAll('input, select').forEach(function (el) {
+    el.addEventListener('input', compute);
+    el.addEventListener('change', compute);
+  });
+  apply(PRESETS.sencha);
+}());
+</script>
+</body>
+</html>
